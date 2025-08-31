@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shared Budgeting App</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, updateDoc, arrayUnion, arrayRemove, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// Set log level to debug for development
+setLogLevel('debug');
+
+var firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+var __app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Global variables
+window.auth = auth;
+window.db = db;
+window.userId = null;
+window.appId = __app_id;
+window.isListening = false;
+
+// UI elements
+const totalBalanceEl = document.getElementById('total-balance');
+const transactionList = document.getElementById('transaction-list');
+const descriptionInput = document.getElementById('description');
+const amountInput = document.getElementById('amount');
+const currentUserIdEl = document.getElementById('current-user-id');
+const userControlSection = document.getElementById('user-control-section');
+
+// Message box for user feedback
+window.showMessage = function(message, type = 'success') {
+const messageBox = document.getElementById('message-box');
+messageBox.textContent = message;
+messageBox.className = `message-box text-center text-white font-semibold`;
+if (type === 'success') {
+messageBox.style.backgroundColor = '#10B981'; // Tailwind green-500
+} else if (type === 'error') {
+messageBox.style.backgroundColor = '#EF4444'; // Tailwind red-500
+} else if (type === 'info') {
+messageBox.style.backgroundColor = '#3B82F6'; // Tailwind blue-500
+}
+messageBox.style.display = 'block';
+messageBox.style.opacity = 1;
+
+setTimeout(() => {
+messageBox.style.opacity = 0;
+setTimeout(() => {
+messageBox.style.display = 'none';
+}, 300);
+}, 3000);
+};
+
+// Function to update the UI with transactions
+function updateUI(transactions) {
+transactionList.innerHTML = '';
+let total = 0;
+transactions.forEach((transaction, index) => {
+total += transaction.amount;
+const listItem = document.createElement('li');
+const color = transaction.amount >= 0 ? 'text-green-600' : 'text-red-600';
+
+listItem.className = `flex justify-between items-center bg-gray-50 p-3 rounded-md shadow-sm`;
+listItem.innerHTML = `
+<span class="text-gray-700">${transaction.description}</span>
+<div class="flex items-center space-x-2">
+<span class="${color} font-semibold">$${transaction.amount.toFixed(2)}</span>
+<button onclick="deleteTransaction('${transaction.id}')" class="text-gray-400 hover:text-red-500 transition duration-150">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+</svg>
+</button>
+</div>
+`;
+transactionList.appendChild(listItem);
+});
+totalBalanceEl.textContent = `$${total.toFixed(2)}`;
+}
+
+// Main function to listen for real-time updates from Firestore
+async function listenForTransactions(targetUserId) {
+try {
+if (window.isListening) return;
+window.isListening = true;
+
+// FIX: Changed to a user-specific path to resolve permissions errors
+const q = collection(db, `artifacts/${window.appId}/users/${window.userId}/transactions`);
+
+const unsubscribe = onSnapshot(q, (querySnapshot) => {
+const transactions = [];
+querySnapshot.forEach((doc) => {
+const data = doc.data();
+transactions.push({ id: doc.id, ...data });
+});
+// Sort transactions by timestamp (assuming it's added)
+transactions.sort((a, b) => b.timestamp - a.timestamp);
+updateUI(transactions);
+});
+showMessage('Connected to database successfully!', 'success');
+} catch (e) {
+console.error("Error setting up listener: ", e);
+showMessage('Error connecting to the database.', 'error');
+}
+}
+
+// Add a new transaction to Firestore
+window.addTransaction = async function(type) {
+if (!window.userId) {
+showMessage('Please wait for authentication to complete.', 'error');
+return;
+}
+
+const description = descriptionInput.value.trim();
+let amount = parseFloat(amountInput.value);
+
+if (!description || isNaN(amount)) {
+showMessage('Please enter a valid description and amount.', 'error');
+return;
+}
+
+// Adjust amount based on type
+if (type === 'expense' && amount > 0) {
+amount = -amount;
+} else if (type === 'income' && amount < 0) {
+amount = -amount;
+}
+
+try {
+// FIX: Changed to a user-specific path to resolve permissions errors
+await addDoc(collection(db, `artifacts/${window.appId}/users/${window.userId}/transactions`), {
+description: description,
+amount: amount,
+timestamp: Date.now(),
+userId: window.userId
+});
+
+descriptionInput.value = '';
+amountInput.value = '';
+showMessage('Transaction added successfully!');
+} catch (e) {
+console.error("Error adding document: ", e);
+showMessage('Error adding transaction.', 'error');
+}
+};
+
+// Delete a transaction from Firestore
+window.deleteTransaction = async function(docId) {
+try {
+// FIX: Changed to a user-specific path to resolve permissions errors
+await deleteDoc(doc(db, `artifacts/${window.appId}/users/${window.userId}/transactions`, docId));
+showMessage('Transaction deleted successfully!');
+} catch (e) {
+console.error("Error removing document: ", e);
+showMessage('Error deleting transaction.', 'error');
+}
+};
+
+// Handle user authentication and start data listening
+onAuthStateChanged(auth, async (user) => {
+if (user) {
+window.userId = user.uid;
+currentUserIdEl.textContent = `User ID: ${window.userId}`;
+userControlSection.style.display = 'block';
+listenForTransactions(window.userId);
+} else {
+window.userId = null;
+currentUserIdEl.textContent = `User ID: Not Signed In`;
+userControlSection.style.display = 'block';
+// If not authenticated, sign in anonymously
+try {
+const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+if (token) {
+await signInWithCustomToken(auth, token);
+} else {
+await signInAnonymously(auth);
+}
+} catch (e) {
+console.error("Error during authentication: ", e);
+showMessage('Authentication failed.', 'error');
+}
+}
+});
+</script>
+</head>
+<body class="bg-gray-100 p-4">
+
+<!-- Message Box for Alerts -->
+<div id="message-box" class="message-box text-center text-white font-semibold"></div>
+
+<div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6 space-y-6">
+<div class="text-center">
+<h1 class="text-3xl font-bold text-gray-800">Shared Budget</h1>
+<p class="text-sm text-gray-500 mt-1">Track your income & expenses together</p>
+<p id="current-user-id" class="text-xs font-mono bg-gray-100 p-2 rounded-md mt-2 break-all text-gray-600">User ID: Loading...</p>
+</div>
+
+<!-- Total Balance -->
+<div class="bg-indigo-600 rounded-lg p-4 text-center text-white">
+<p class="text-sm font-medium opacity-80">Current Balance</p>
+<p id="total-balance" class="text-4xl font-extrabold mt-1">$0.00</p>
+</div>
+
+<!-- Transaction Form -->
+<div id="user-control-section" style="display: none;">
+<form id="transaction-form" class="space-y-4">
+<div>
+<label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+<input type="text" id="description" placeholder="e.g., Coffee, Paycheck" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-gray-800 focus:ring-indigo-500 focus:border-indigo-500" required>
+</div>
+<div>
+<label for="amount" class="block text-sm font-medium text-gray-700">Amount</label>
+<input type="number" id="amount" placeholder="e.g., 5.00 or -5.00" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-gray-800 focus:ring-indigo-500 focus:border-indigo-500" required>
+</div>
+<div class="flex items-center space-x-4">
+<button type="button" onclick="addTransaction('income')" class="w-1/2 flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+</svg>
+Income
+</button>
+<button type="button" onclick="addTransaction('expense')" class="w-1/2 flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clip-rule="evenodd" />
+</svg>
+Expense
+</button>
+</div>
+</form>
+</div>
+
+<!-- Transaction History -->
+<div>
+<h2 class="text-xl font-bold text-gray-800 mb-2">History</h2>
+<ul id="transaction-list" class="space-y-2">
+<li class="text-gray-500 text-center">Loading transactions...</li>
+</ul>
+</div>
+</div>
+</body>
+</html>
