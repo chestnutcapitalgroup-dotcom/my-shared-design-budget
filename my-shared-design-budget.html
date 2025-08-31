@@ -99,22 +99,8 @@
     // The following variables are provided by the canvas environment.
     // We use fallbacks for local development.
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    let firebaseConfig = {};
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-    // --- Firebase Initialization ---
-    let app, auth, db, userId;
-
-    try {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
-        setLogLevel('debug');
-        console.log("Firebase initialized.");
-    } catch (error) {
-        console.error("Failed to initialize Firebase:", error);
-        document.getElementById('loadingIndicator').textContent = 'Error: Failed to initialize Firebase.';
-    }
 
     // --- DOM Elements ---
     const loadingIndicator = document.getElementById('loadingIndicator');
@@ -178,56 +164,85 @@
     };
 
     // --- Main Authentication & Data Fetching Logic ---
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            userId = user.uid;
-            console.log("User authenticated:", userId);
-            displayUserId(userId);
-            showApp();
+    let app, auth, db, userId;
 
-            // Set up a real-time listener for the tasks collection
-            const q = query(collection(db, `artifacts/${appId}/users/${userId}/tasks`));
-            onSnapshot(q, (querySnapshot) => {
-                const tasks = [];
-                querySnapshot.forEach((doc) => {
-                    tasks.push({ id: doc.id, ...doc.data() });
-                });
-                renderTasks(tasks);
-                console.log("Tasks updated.");
-            }, (error) => {
-                console.error("Error fetching tasks:", error);
-                document.getElementById('loadingIndicator').textContent = 'Error: Failed to load tasks.';
-            });
-
-            // Handle new task submission
-            taskForm.onsubmit = async (e) => {
-                e.preventDefault();
-                const taskText = taskInput.value.trim();
-                if (taskText) {
-                    await addDoc(collection(db, `artifacts/${appId}/users/${userId}/tasks`), {
-                        text: taskText,
-                        completed: false,
-                        createdAt: new Date()
-                    });
-                    taskInput.value = '';
-                    console.log("Task added:", taskText);
-                }
-            };
-        } else {
-            console.log("No user signed in. Attempting to sign in with token or anonymously.");
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Authentication failed:", error);
-                document.getElementById('loadingIndicator').textContent = 'Error: Authentication failed.';
-            }
+    try {
+        if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+            throw new Error('Firebase configuration is missing or invalid.');
         }
-    });
+        firebaseConfig = JSON.parse(__firebase_config);
+        
+        if (!firebaseConfig.apiKey) {
+            throw new Error('Firebase apiKey is missing from the configuration.');
+        }
+
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        setLogLevel('debug');
+        console.log("Firebase initialized successfully.");
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("User authenticated:", userId);
+                displayUserId(userId);
+                showApp();
+
+                // Set up a real-time listener for the tasks collection
+                const q = query(collection(db, `artifacts/${appId}/users/${userId}/tasks`));
+                onSnapshot(q, (querySnapshot) => {
+                    const tasks = [];
+                    querySnapshot.forEach((doc) => {
+                        tasks.push({ id: doc.id, ...doc.data() });
+                    });
+                    renderTasks(tasks);
+                    console.log("Tasks updated.");
+                }, (error) => {
+                    console.error("Error fetching tasks:", error);
+                    document.getElementById('loadingIndicator').textContent = 'Error: Failed to load tasks.';
+                });
+
+                // Handle new task submission
+                taskForm.onsubmit = async (e) => {
+                    e.preventDefault();
+                    const taskText = taskInput.value.trim();
+                    if (taskText) {
+                        await addDoc(collection(db, `artifacts/${appId}/users/${userId}/tasks`), {
+                            text: taskText,
+                            completed: false,
+                            createdAt: new Date()
+                        });
+                        taskInput.value = '';
+                        console.log("Task added:", taskText);
+                    }
+                };
+            } else {
+                console.log("No user signed in. Attempting to sign in with token or anonymously.");
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Authentication failed:", error);
+                    document.getElementById('loadingIndicator').textContent = 'Error: Authentication failed.';
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Failed to initialize Firebase:", error);
+        loadingIndicator.innerHTML = `
+            <div class="text-center p-4 rounded-lg bg-red-800 text-white font-semibold">
+                Error: Failed to initialize Firebase. <br>
+                ${error.message}<br>
+            </div>
+            <div class="mt-4 text-xs text-gray-500 font-mono">
+                Check the console for more details.
+            </div>
+        `;
+    }
   </script>
 </body>
 </html>
-
