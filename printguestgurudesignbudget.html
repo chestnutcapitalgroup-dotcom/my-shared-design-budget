@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guest Guru Interior Design Budget</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body {
+font-family: 'Inter', sans-serif;
+background-color: #f3f4f6;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+input[type="number"] {
+-moz-appearance: textfield;
+text-align: right;
+border: 1px solid #d1d5db;
+padding: 4px;
+width: 80px;
+border-radius: 6px;
+}
+input[type="text"] {
+text-align: left;
+border: 1px solid #d1d5db;
+padding: 4px;
+width: 150px;
+border-radius: 6px;
+}
+/* Custom styles for the room title input field */
+.room-title-input {
+font-size: 1.5rem;
+line-height: 2rem;
+font-weight: 700;
+color: #1f2937;
+padding: 0;
+border: none;
+background: transparent;
+outline: none;
+width: 100%;
+}
+@media (min-width: 640px) {
+.room-title-input {
+font-size: 1.875rem;
+line-height: 2.25rem;
+}
+}
+table {
+width: 100%;
+border-collapse: collapse;
+font-size: 0.9rem;
+}
+th, td {
+padding: 12px 8px;
+text-align: left;
+border-bottom: 1px solid #e5e7eb;
+}
+th {
+background-color: #f9fafb;
+font-weight: 600;
+color: #4b5563;
+}
+tr.subtotal-row td {
+font-weight: 700;
+background-color: #f1f5f9;
+}
+tr.grand-total-row td {
+font-size: 1.1rem;
+font-weight: 700;
+background-color: #e2e8f0;
+}
+
+/* Modal specific styles */
+.modal {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.5);
+display: flex;
+justify-content: center;
+align-items: center;
+z-index: 1000;
+}
+
+.modal-content {
+background-color: white;
+padding: 2rem;
+border-radius: 1rem;
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+max-width: 90%;
+width: 400px;
+text-align: center;
+}
+
+/* Print-specific styles */
+@media print {
+/* Hide all interactive elements */
+#tax-rate-input,
+#add-room-btn,
+.remove-room-btn,
+.add-item-btn,
+.remove-item-btn,
+.edit-title-btn,
+.budget-input,
+.no-print {
+display: none !important;
+}
+
+/* Ensure the main content is visible and takes up space */
+body, .max-w-4xl {
+background-color: white !important;
+padding: 0 !important;
+margin: 0 !important;
+box-shadow: none !important;
+}
+
+/* Make text content static */
+.print-display {
+display: inline !important;
+}
+
+/* Ensure grand total section is visible */
+.grand-total-section {
+display: block !important;
+}
+}
+</style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8">
+<div class="max-w-4xl mx-auto bg-white p-6 sm:p-10 rounded-2xl shadow-xl">
+<h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2">Guest Guru Interior Design Budget</h1>
+<p class="text-gray-500 mb-8">This interactive tracker allows you to update actual costs and automatically recalculate totals. You can also add new items as needed.</p>
+
+<!-- Global Tax Rate Input -->
+<div class="mb-6 flex items-center no-print">
+<label for="tax-rate-input" class="text-sm font-semibold text-gray-700 mr-2">Tax Rate (%):</label>
+<input type="number" id="tax-rate-input" value="7" class="w-20 text-right px-2 py-1 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+</div>
+
+<!-- Container for all budget sections -->
+<div id="budget-container"></div>
+
+<!-- Add Room and Print Buttons -->
+<div class="mt-8 flex justify-end space-x-4 no-print">
+<button id="add-room-btn" class="bg-blue-500 text-white font-bold py-2 px-6 rounded-full shadow-lg hover:bg-blue-600 transition duration-300">Add New Room</button>
+<button id="print-btn" onclick="handlePrint()" class="bg-gray-500 text-white font-bold py-2 px-6 rounded-full shadow-lg hover:bg-gray-600 transition duration-300">Print to PDF</button>
+</div>
+
+<!-- Grand Total Section -->
+<div class="mt-8 pt-6 border-t-2 border-dashed border-gray-300 grand-total-section">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-end font-bold text-gray-900 text-lg sm:text-xl">
+<span class="mb-2 sm:mb-0">Total Estimated Cost:</span>
+<span id="grand-estimated" class="text-2xl font-extrabold text-red-500">$0.00</span>
+</div>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-end font-bold text-gray-900 text-lg sm:text-xl mt-4">
+<span class="mb-2 sm:mb-0">Total Actual Cost:</span>
+<span id="grand-actual" class="text-2xl font-extrabold text-green-600">$0.00</span>
+</div>
+</div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="modal hidden no-print">
+<div class="modal-content">
+<p id="modal-text" class="text-lg font-semibold mb-4">Are you sure you want to delete this?</p>
+<div class="flex justify-center space-x-4">
+<button id="confirm-yes" class="bg-red-500 text-white font-bold py-2 px-4 rounded-full shadow-lg hover:bg-red-600 transition duration-300">Yes, delete</button>
+<button id="confirm-no" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg hover:bg-gray-400 transition duration-300">No, cancel</button>
+</div>
+</div>
+</div>
+
+<script>
+let budgetData = [
+{
+room: "Front Porch",
+taxableItems: [
+{ name: "Bench", quantity: 1, estimatedUnitPrice: 200, actualUnitPrice: 450 },
+{ name: "Table(s)", quantity: 2, estimatedUnitPrice: 50, actualUnitPrice: 117.99 },
+{ name: "Outdoor rug (6' 7)", quantity: 1, estimatedUnitPrice: 0, actualUnitPrice: 109 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Patio",
+taxableItems: [
+{ name: "Grill", quantity: 1, estimatedUnitPrice: 1000, actualUnitPrice: 299 },
+{ name: "Grill cover", quantity: 1, estimatedUnitPrice: 0, actualUnitPrice: 14 },
+{ name: "BBQ Tools", quantity: 1, estimatedUnitPrice: 50, actualUnitPrice: 0 },
+{ name: "Pool toys / beach items", quantity: 1, estimatedUnitPrice: 75, actualUnitPrice: 0 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Living Room",
+taxableItems: [
+{ name: "Sofa", quantity: 1, estimatedUnitPrice: 1200, actualUnitPrice: 0 },
+{ name: "Side Table(s)", quantity: 2, estimatedUnitPrice: 100, actualUnitPrice: 79.99 },
+{ name: "Coffee Table", quantity: 1, estimatedUnitPrice: 400, actualUnitPrice: 0 },
+{ name: "TV Console", quantity: 1, estimatedUnitPrice: 250, actualUnitPrice: 0 },
+{ name: "Area Rug", quantity: 1, estimatedUnitPrice: 300, actualUnitPrice: 524 },
+{ name: "Lamps", quantity: 2, estimatedUnitPrice: 100, actualUnitPrice: 64.4 },
+{ name: "Chairs", quantity: 2, estimatedUnitPrice: 150, actualUnitPrice: 199.98 },
+{ name: "Decor", quantity: 1, estimatedUnitPrice: 300, actualUnitPrice: 0 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Dining & Pantry",
+taxableItems: [
+{ name: "Table", quantity: 1, estimatedUnitPrice: 1000, actualUnitPrice: 819 },
+{ name: "Chairs", quantity: 6, estimatedUnitPrice: 150, actualUnitPrice: 199 },
+{ name: "Rug 8x10", quantity: 1, estimatedUnitPrice: 250, actualUnitPrice: 399 },
+{ name: "Decor", quantity: 1, estimatedUnitPrice: 200, actualUnitPrice: 0 },
+{ name: "Pantry shelf brackets", quantity: 1, estimatedUnitPrice: 0, actualUnitPrice: 28.90 },
+{ name: "Pantry shelves", quantity: 1, estimatedUnitPrice: 0, actualUnitPrice: 118.80 },
+{ name: "Pantry sideboard", quantity: 1, estimatedUnitPrice: 0, actualUnitPrice: 313.99 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Master Suite",
+taxableItems: [
+{ name: "Bed Frame", quantity: 1, estimatedUnitPrice: 1000, actualUnitPrice: 729 },
+{ name: "Sconces", quantity: 2, estimatedUnitPrice: 150, actualUnitPrice: 199.9 },
+{ name: "Nightstands", quantity: 2, estimatedUnitPrice: 100, actualUnitPrice: 179.99 },
+{ name: "Dresser", quantity: 1, estimatedUnitPrice: 500, actualUnitPrice: 0 },
+{ name: "Rug", quantity: 1, estimatedUnitPrice: 250, actualUnitPrice: 289.99 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Bedroom 2",
+taxableItems: [
+{ name: "Beds", quantity: 2, estimatedUnitPrice: 500, actualUnitPrice: 1288 },
+{ name: "Nightstand", quantity: 1, estimatedUnitPrice: 100, actualUnitPrice: 94 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Bedroom 3",
+taxableItems: [
+{ name: "Bed", quantity: 1, estimatedUnitPrice: 500, actualUnitPrice: 269 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Laundry",
+taxableItems: [
+{ name: "Washer", quantity: 1, estimatedUnitPrice: 900, actualUnitPrice: 599 },
+{ name: "Dryer", quantity: 1, estimatedUnitPrice: 900, actualUnitPrice: 599 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Mudroom",
+taxableItems: [
+{ name: "Mudroom bench", quantity: 1, estimatedUnitPrice: 250, actualUnitPrice: 209.99 },
+{ name: "Rug", quantity: 1, estimatedUnitPrice: 100, actualUnitPrice: 0 },
+],
+nonTaxableItems: [],
+},
+{
+room: "First Floor Bath",
+taxableItems: [
+{ name: "Vanity", quantity: 1, estimatedUnitPrice: 350, actualUnitPrice: 329 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Kitchen",
+taxableItems: [
+{ name: "Refrigerator", quantity: 1, estimatedUnitPrice: 2000, actualUnitPrice: 1598 },
+{ name: "Coffee maker", quantity: 1, estimatedUnitPrice: 150, actualUnitPrice: 0 },
+{ name: "Toaster", quantity: 1, estimatedUnitPrice: 40, actualUnitPrice: 0 },
+{ name: "Kettle", quantity: 1, estimatedUnitPrice: 30, actualUnitPrice: 0 },
+{ name: "Rice Cooker", quantity: 1, estimatedUnitPrice: 50, actualUnitPrice: 0 },
+{ name: "Cutting Boards (2)", quantity: 2, estimatedUnitPrice: 20, actualUnitPrice: 0 },
+{ name: "Pots & Pans", quantity: 1, estimatedUnitPrice: 150, actualUnitPrice: 0 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Household Goods & Linens",
+taxableItems: [
+{ name: "Bed Sheets (3 sets per bed)", quantity: 3, estimatedUnitPrice: 100, actualUnitPrice: 0 },
+{ name: "Mattress Protectors", quantity: 3, estimatedUnitPrice: 25, actualUnitPrice: 0 },
+{ name: "Pillows with Protectors", quantity: 4, estimatedUnitPrice: 30, actualUnitPrice: 0 },
+{ name: "Bedcovers / Doonas", quantity: 3, estimatedUnitPrice: 80, actualUnitPrice: 0 },
+{ name: "Bath Towels (2 per guest)", quantity: 14, estimatedUnitPrice: 15, actualUnitPrice: 0 },
+{ name: "Pool Towels (2 per guest)", quantity: 14, estimatedUnitPrice: 15, actualUnitPrice: 0 },
+{ name: "Face & Hand Towels", quantity: 6, estimatedUnitPrice: 5, actualUnitPrice: 0 },
+{ name: "Iron & Ironing Board", quantity: 1, estimatedUnitPrice: 50, actualUnitPrice: 0 },
+{ name: "Vacuum Cleaner", quantity: 1, estimatedUnitPrice: 200, actualUnitPrice: 0 },
+{ name: "First Aid Kit", quantity: 1, estimatedUnitPrice: 30, actualUnitPrice: 0 },
+{ name: "Fire Extinguisher", quantity: 1, estimatedUnitPrice: 40, actualUnitPrice: 0 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Security & Electronics",
+taxableItems: [
+{ name: "Noise Aware Device", quantity: 1, estimatedUnitPrice: 150, actualUnitPrice: 0 },
+{ name: "Yale Assure WI-FI Smart Locks", quantity: 1, estimatedUnitPrice: 250, actualUnitPrice: 0 },
+{ name: "Ring Security Doorbell", quantity: 1, estimatedUnitPrice: 180, actualUnitPrice: 0 },
+{ name: "Smart TV", quantity: 1, estimatedUnitPrice: 400, actualUnitPrice: 0 },
+{ name: "Internet Connection", quantity: 1, estimatedUnitPrice: 100, actualUnitPrice: 0 },
+{ name: "Back-up batteries", quantity: 1, estimatedUnitPrice: 15, actualUnitPrice: 0 },
+],
+nonTaxableItems: [],
+},
+{
+room: "Design & Labor",
+taxableItems: [],
+nonTaxableItems: [
+{ name: "Design & Consulting Fees", quantity: 1, estimatedUnitPrice: 4560, actualUnitPrice: 0 },
+{ name: "Contractor Fees", quantity: 1, estimatedUnitPrice: 2000, actualUnitPrice: 0 },
+{ name: "Electrician Fees", quantity: 1, estimatedUnitPrice: 750, actualUnitPrice: 0 },
+{ name: "Plumber Fees", quantity: 1, estimatedUnitPrice: 750, actualUnitPrice: 0 },
+],
+},
+{
+room: "Logistics & Installation",
+taxableItems: [],
+nonTaxableItems: [
+{ name: "Delivery & Freight", quantity: 1, estimatedUnitPrice: 500, actualUnitPrice: 0 },
+{ name: "Assembly & Installation", quantity: 1, estimatedUnitPrice: 500, actualUnitPrice: 0 },
+{ name: "Furniture Disposal", quantity: 1, estimatedUnitPrice: 150, actualUnitPrice: 0 },
+],
+}
+];
+
+let roomIndexToDelete = null;
+let itemIndexToDelete = null;
+
+function renderRoomTable(roomData, roomIndex) {
+let roomEstimatedTotal = 0;
+let roomActualTotal = 0;
+
+// Render taxable items
+const taxableTableRows = roomData.taxableItems.map((item, itemIndex) => {
+const estimatedTotal = (item.estimatedUnitPrice * item.quantity).toFixed(2);
+const actualPriceToUse = item.actualUnitPrice > 0 ? item.actualUnitPrice : item.estimatedUnitPrice;
+const taxRate = parseFloat(document.getElementById('tax-rate-input').value) / 100 + 1;
+const actualTotal = (actualPriceToUse * item.quantity * taxRate).toFixed(2);
+roomEstimatedTotal += parseFloat(estimatedTotal);
+roomActualTotal += parseFloat(actualTotal);
+
+return `
+<tr>
+<td>
+<input type="text" value="${item.name}" class="budget-input w-full no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="name" data-item-type="taxable">
+<span class="print-display hidden">${item.name}</span>
+<button class="remove-item-btn text-red-400 hover:text-red-600 transition duration-300 no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-item-type="taxable">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+</svg>
+</button>
+</td>
+<td class="text-right">
+<input type="number" step="1" value="${item.quantity}" class="budget-input text-right no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="quantity" data-item-type="taxable">
+<span class="print-display hidden">${item.quantity}</span>
+</td>
+<td class="text-right">
+<input type="number" step="0.01" value="${item.estimatedUnitPrice}" class="budget-input text-right no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="estimatedUnitPrice" data-item-type="taxable">
+<span class="print-display hidden">$${item.estimatedUnitPrice.toFixed(2)}</span>
+</td>
+<td class="text-right">$<span class="estimated-total">${estimatedTotal}</span></td>
+<td class="text-right">
+<input type="number" step="0.01" value="${item.actualUnitPrice}" class="budget-input text-right no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="actualUnitPrice" data-item-type="taxable">
+<span class="print-display hidden">$${item.actualUnitPrice.toFixed(2)}</span>
+</td>
+<td class="text-right">$<span class="actual-total">${actualTotal}</span></td>
+</tr>
+`;
+}).join('');
+
+// Render non-taxable items
+const nonTaxableTableRows = roomData.nonTaxableItems.map((item, itemIndex) => {
+const estimatedTotal = (item.estimatedUnitPrice * item.quantity).toFixed(2);
+const actualPriceToUse = item.actualUnitPrice > 0 ? item.actualUnitPrice : item.estimatedUnitPrice;
+const actualTotal = (actualPriceToUse * item.quantity).toFixed(2);
+roomEstimatedTotal += parseFloat(estimatedTotal);
+roomActualTotal += parseFloat(actualTotal);
+
+return `
+<tr>
+<td>
+<input type="text" value="${item.name}" class="budget-input w-full no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="name" data-item-type="non-taxable">
+<span class="print-display hidden">${item.name}</span>
+<button class="remove-item-btn text-red-400 hover:text-red-600 transition duration-300 no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-item-type="non-taxable">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+</svg>
+</button>
+</td>
+<td class="text-right">
+<input type="number" step="1" value="${item.quantity}" class="budget-input text-right no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="quantity" data-item-type="non-taxable">
+<span class="print-display hidden">${item.quantity}</span>
+</td>
+<td class="text-right">
+<input type="number" step="0.01" value="${item.estimatedUnitPrice}" class="budget-input text-right no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="estimatedUnitPrice" data-item-type="non-taxable">
+<span class="print-display hidden">$${item.estimatedUnitPrice.toFixed(2)}</span>
+</td>
+<td class="text-right">$<span class="estimated-total">${estimatedTotal}</span></td>
+<td class="text-right">
+<input type="number" step="0.01" value="${item.actualUnitPrice}" class="budget-input text-right no-print" data-room-index="${roomIndex}" data-item-index="${itemIndex}" data-field="actualUnitPrice" data-item-type="non-taxable">
+<span class="print-display hidden">$${item.actualUnitPrice.toFixed(2)}</span>
+</td>
+<td class="text-right">$<span class="actual-total">${actualTotal}</span></td>
+</tr>
+`;
+}).join('');
+
+return `
+<div class="mb-8" data-room-index="${roomIndex}">
+<div class="flex items-center space-x-4 room-title-container">
+<h2 class="text-2xl sm:text-3xl font-extrabold text-gray-800">${roomData.room}</h2>
+<button class="edit-title-btn text-gray-400 hover:text-gray-600 transition duration-300 p-1 rounded-full no-print" data-room-index="${roomIndex}">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-3.103 8.586l-1.55 1.55-.793.793-.793-.793-1.55-1.55a1 1 0 011.414-1.414l.793.793 1.55-1.55a1 1 0 011.414 1.414z"/>
+</svg>
+</button>
+</div>
+<div class="bg-white rounded-xl shadow-md overflow-hidden mt-4">
+<h3 class="bg-gray-100 px-6 py-2 text-sm font-semibold text-gray-700">Taxable Items</h3>
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-50">
+<tr>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Qty</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Est. Unit Price</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Est. Total</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Actual Unit Price</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Actual Total w/Tax</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200">
+${taxableTableRows}
+</tbody>
+</table>
+<div class="px-6 py-2 bg-gray-100 flex justify-end no-print">
+<button class="add-item-btn bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg hover:bg-gray-300 transition duration-300" data-room-index="${roomIndex}" data-item-type="taxable">Add Taxable Item</button>
+</div>
+<h3 class="bg-gray-100 px-6 py-2 text-sm font-semibold text-gray-700 mt-4">Non-Taxable Items</h3>
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-50">
+<tr>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Qty</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Est. Unit Price</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Est. Total</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Actual Unit Price</th>
+<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Actual Total</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200">
+${nonTaxableTableRows}
+</tbody>
+</table>
+<div class="px-6 py-2 bg-gray-100 flex justify-end no-print">
+<button class="add-item-btn bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg hover:bg-gray-300 transition duration-300" data-room-index="${roomIndex}" data-item-type="non-taxable">Add Non-Taxable Item</button>
+</div>
+</div>
+<div class="mt-4 flex justify-between">
+<button class="remove-room-btn bg-red-500 text-white font-bold py-2 px-4 rounded-full shadow-lg hover:bg-red-600 transition duration-300 no-print" data-room-index="${roomIndex}">Remove Room</button>
+</div>
+<div class="mt-4 pt-4 border-t border-dashed border-gray-300">
+<div class="flex justify-between items-end font-bold text-gray-900 text-lg">
+<span class="mb-2 sm:mb-0">Room Total Estimated:</span>
+<span id="room-estimated-total-${roomIndex}" class="text-xl font-extrabold text-red-500">$${roomEstimatedTotal.toFixed(2)}</span>
+</div>
+<div class="flex justify-between items-end font-bold text-gray-900 text-lg mt-2">
+<span class="mb-2 sm:mb-0">Room Total Actual:</span>
+<span id="room-actual-total-${roomIndex}" class="text-xl font-extrabold text-green-600">$${roomActualTotal.toFixed(2)}</span>
+</div>
+</div>
+</div>
+`;
+}
+
+function showRoomConfirmModal(roomIndex) {
+roomIndexToDelete = roomIndex;
+itemIndexToDelete = null;
+document.getElementById('modal-text').innerText = "Are you sure you want to delete this room?";
+const modal = document.getElementById('confirm-modal');
+modal.classList.remove('hidden');
+}
+
+function showItemConfirmModal(roomIndex, itemIndex, itemType) {
+roomIndexToDelete = roomIndex;
+itemIndexToDelete = itemIndex;
+itemTypeToDelete = itemType;
+document.getElementById('modal-text').innerText = "Are you sure you want to delete this item?";
+const modal = document.getElementById('confirm-modal');
+modal.classList.remove('hidden');
+}
+
+function hideConfirmModal() {
+const modal = document.getElementById('confirm-modal');
+modal.classList.add('hidden');
+roomIndexToDelete = null;
+itemIndexToDelete = null;
+itemTypeToDelete = null;
+}
+
+function confirmDelete() {
+if (roomIndexToDelete !== null && itemIndexToDelete === null) {
+budgetData.splice(roomIndexToDelete, 1);
+} else if (roomIndexToDelete !== null && itemIndexToDelete !== null) {
+if (itemTypeToDelete === 'taxable') {
+budgetData[roomIndexToDelete].taxableItems.splice(itemIndexToDelete, 1);
+} else if (itemTypeToDelete === 'non-taxable') {
+budgetData[roomIndexToDelete].nonTaxableItems.splice(itemIndexToDelete, 1);
+}
+}
+hideConfirmModal();
+renderBudget();
+}
+
+function addRoom() {
+const newRoomData = {
+room: "New Room",
+taxableItems: [],
+nonTaxableItems: [],
+};
+budgetData.push(newRoomData);
+renderBudget();
+}
+
+function updateGrandTotals() {
+let grandEstimatedTotal = 0;
+let grandActualTotal = 0;
+const taxRate = parseFloat(document.getElementById('tax-rate-input').value) / 100 + 1;
+
+budgetData.forEach(roomData => {
+roomData.taxableItems.forEach(item => {
+grandEstimatedTotal += item.estimatedUnitPrice * item.quantity;
+const actualPriceToUse = item.actualUnitPrice > 0 ? item.actualUnitPrice : item.estimatedUnitPrice;
+grandActualTotal += actualPriceToUse * item.quantity * taxRate;
+});
+roomData.nonTaxableItems.forEach(item => {
+grandEstimatedTotal += item.estimatedUnitPrice * item.quantity;
+const actualPriceToUse = item.actualUnitPrice > 0 ? item.actualUnitPrice : item.estimatedUnitPrice;
+grandActualTotal += actualPriceToUse * item.quantity;
+});
+});
+
+document.getElementById('grand-estimated').innerText = `$${grandEstimatedTotal.toFixed(2)}`;
+document.getElementById('grand-actual').innerText = `$${grandActualTotal.toFixed(2)}`;
+}
+
+function renderBudget() {
+const container = document.getElementById('budget-container');
+container.innerHTML = budgetData.map((data, index) => renderRoomTable(data, index)).join('');
+attachEventListeners();
+updateGrandTotals();
+}
+
+function attachEventListeners() {
+document.querySelectorAll('.budget-input').forEach(input => {
+input.addEventListener('input', (event) => {
+const roomIndex = parseInt(event.target.dataset.roomIndex);
+const field = event.target.dataset.field;
+const itemType = event.target.dataset.itemType;
+const itemIndex = parseInt(event.target.dataset.itemIndex);
+
+let newValue = parseFloat(event.target.value);
+if (isNaN(newValue) || newValue < 0) {
+newValue = 0;
+}
+
+let item;
+if (itemType === 'taxable') {
+item = budgetData[roomIndex].taxableItems[itemIndex];
+} else if (itemType === 'non-taxable') {
+item = budgetData[roomIndex].nonTaxableItems[itemIndex];
+}
+if (field === 'name') {
+item[field] = event.target.value;
+} else {
+item[field] = newValue;
+}
+
+const taxRate = parseFloat(document.getElementById('tax-rate-input').value) / 100 + 1;
+let currentRoomEstimatedTotal = 0;
+let currentRoomActualTotal = 0;
+
+budgetData[roomIndex].taxableItems.forEach(i => {
+currentRoomEstimatedTotal += i.estimatedUnitPrice * i.quantity;
+const actualPrice = i.actualUnitPrice > 0 ? i.actualUnitPrice : i.estimatedUnitPrice;
+currentRoomActualTotal += actualPrice * i.quantity * taxRate;
+});
+budgetData[roomIndex].nonTaxableItems.forEach(i => {
+currentRoomEstimatedTotal += i.estimatedUnitPrice * i.quantity;
+const actualPrice = i.actualUnitPrice > 0 ? i.actualUnitPrice : i.estimatedUnitPrice;
+currentRoomActualTotal += actualPrice * i.quantity;
+});
+
+const roomEstimatedTotalSpan = document.getElementById(`room-estimated-total-${roomIndex}`);
+const roomActualTotalSpan = document.getElementById(`room-actual-total-${roomIndex}`);
+if (roomEstimatedTotalSpan) roomEstimatedTotalSpan.innerText = `$${currentRoomEstimatedTotal.toFixed(2)}`;
+if (roomActualTotalSpan) roomActualTotalSpan.innerText = `$${currentRoomActualTotal.toFixed(2)}`;
+
+const row = event.target.closest('tr');
+const estimatedTotal = (item.estimatedUnitPrice * item.quantity).toFixed(2);
+const actualPriceToUse = item.actualUnitPrice > 0 ? item.actualUnitPrice : item.estimatedUnitPrice;
+const actualTotal = itemType === 'taxable' ? (actualPriceToUse * item.quantity * taxRate).toFixed(2) : (actualPriceToUse * item.quantity).toFixed(2);
+if(row) {
+row.querySelector('.estimated-total').innerText = estimatedTotal;
+row.querySelector('.actual-total').innerText = actualTotal;
+}
+
+updateGrandTotals();
+});
+});
+
+document.querySelectorAll('.remove-item-btn').forEach(button => {
+button.addEventListener('click', (event) => {
+const roomIndex = parseInt(event.target.dataset.roomIndex);
+const itemIndex = parseInt(event.target.dataset.itemIndex);
+const itemType = event.target.dataset.itemType;
+showItemConfirmModal(roomIndex, itemIndex, itemType);
+});
+});
+
+document.querySelectorAll('.remove-room-btn').forEach(button => {
+button.addEventListener('click', (event) => {
+const roomIndex = parseInt(event.target.dataset.roomIndex);
+showRoomConfirmModal(roomIndex);
+});
+});
+
+document.querySelectorAll('.add-item-btn').forEach(button => {
+button.addEventListener('click', (event) => {
+const roomIndex = parseInt(event.target.dataset.roomIndex);
+const itemType = event.target.dataset.itemType;
+const newDefaultItem = {
+name: "New Item",
+quantity: 1,
+estimatedUnitPrice: 0,
+actualUnitPrice: 0,
+};
+if (itemType === 'taxable') {
+budgetData[roomIndex].taxableItems.push(newDefaultItem);
+} else if (itemType === 'non-taxable') {
+budgetData[roomIndex].nonTaxableItems.push(newDefaultItem);
+}
+renderBudget();
+});
+});
+
+document.querySelectorAll('.edit-title-btn').forEach(button => {
+button.addEventListener('click', () => {
+const roomIndex = parseInt(button.dataset.room-index);
+const roomContainer = document.querySelector(`div[data-room-index="${roomIndex}"]`);
+const titleContainer = roomContainer.querySelector('.room-title-container');
+const h2 = titleContainer.querySelector('h2');
+const editButton = titleContainer.querySelector('.edit-title-btn');
+
+h2.style.display = 'none';
+editButton.style.display = 'none';
+
+const input = document.createElement('input');
+input.type = 'text';
+input.className = 'room-title-input';
+input.value = budgetData[roomIndex].room;
+
+const saveTitle = () => {
+const newTitle = input.value.trim();
+if (newTitle !== '') {
+budgetData[roomIndex].room = newTitle;
+}
+renderBudget();
+};
+
+input.addEventListener('blur', saveTitle);
+input.addEventListener('keydown', (e) => {
+if (e.key === 'Enter') {
+e.preventDefault();
+saveTitle();
+}
+});
+
+titleContainer.prepend(input);
+input.focus();
+});
+});
+}
+
+function setupGlobalListeners() {
+document.getElementById('add-room-btn').addEventListener('click', addRoom);
+document.getElementById('print-btn').addEventListener('click', handlePrint);
+document.getElementById('confirm-yes').addEventListener('click', confirmDelete);
+document.getElementById('confirm-no').addEventListener('click', hideConfirmModal);
+document.getElementById('tax-rate-input').addEventListener('input', renderBudget);
+}
+
+function handlePrint() {
+window.print();
+}
+
+window.onload = function() {
+renderBudget();
+setupGlobalListeners();
+};
+</script>
+</body>
+</html>
